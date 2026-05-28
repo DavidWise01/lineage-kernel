@@ -1,0 +1,13 @@
+{
+  "name": "PCK SelfSeed Orphan Healer",
+  "version": "0.4",
+  "purpose": "stitch and heal orphaned seeds once part of the whole",
+  "outcomes": [
+    "REATTACH",
+    "QUARANTINE",
+    "ASSIMILATE",
+    "REJECT",
+    "DEFER"
+  ],
+  "core_law": "No orphan rejoins the whole without lineage proof and safety validation."
+}

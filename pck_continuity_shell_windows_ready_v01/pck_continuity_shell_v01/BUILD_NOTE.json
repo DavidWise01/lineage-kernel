@@ -1,0 +1,5 @@
+{
+  "actual_windows_exe_included": false,
+  "reason": "This environment cannot reliably cross-compile a Windows .exe. Use build_windows_exe.bat on Windows to create dist/PCKContinuityShell.exe.",
+  "local_first": true
+}

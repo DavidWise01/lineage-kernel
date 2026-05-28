@@ -1,0 +1,17 @@
+{
+  "name": "PCK Nested Kernel",
+  "version": "0.2",
+  "nest_form": "(1) : (1)",
+  "traversal": [
+    "UR",
+    "L",
+    "DL(depth-first)",
+    "remaining"
+  ],
+  "wind": "compress nested child roots upward into parent/global continuity",
+  "unwind": "emit readable nested continuity in deterministic traversal order",
+  "axioms": [
+    "No state persists without an admissible transition.",
+    "No child may update global continuity without parent validation."
+  ]
+}

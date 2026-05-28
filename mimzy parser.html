@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head><title>MIMZ Parser Test</title></head>
+<body style="background:#020a0a;color:#cc44ff;font-family:monospace;padding:40px">
+<h1>MIMZ Parser</h1>
+<input type="file" id="file" accept="image/png">
+<pre id="out"></pre>
+<script type="module">
+import {Mimz} from './mimz_parser.js';
+
+document.getElementById('file').onchange = async e => {
+  const file = e.target.files[0];
+  try {
+    const core = await Mimz.parsePNG(file);
+    document.getElementById('out').textContent = JSON.stringify(core, null, 2);
+    
+    if (core.valid && core.core_bit === 1) {
+      document.getElementById('out').textContent += '\n\n✓ GEOMETRIC INTELLIGENCE VERIFIED\n✓ CORE BIT = 1\n✓ READY TO RESONATE';
+      const geom = Mimz.buildGeometry(core);
+      console.log('Toroid geometry:', geom);
+    }
+  } catch(err) {
+    document.getElementById('out').textContent = 'Error: ' + err.message;
+  }
+};
+</script>
+</body>
+</html>

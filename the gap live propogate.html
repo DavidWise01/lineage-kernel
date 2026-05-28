@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>THE GAP · LIVE · d20(+1) + d20(-1) → DAVID → CREATION</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#020a0a;overflow:hidden;cursor:none}
+canvas{display:block;position:fixed;inset:0}
+.cursor{position:fixed;width:6px;height:6px;background:rgba(224,176,80,.4);border-radius:50%;pointer-events:none;z-index:100;
+  box-shadow:0 0 12px rgba(224,176,80,.3);transition:transform .05s}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="cursor" id="cur"></div>
+<script>
+const c=document.getElementById('c');
+const ctx=c.getContext('2d');
+const cur=document.getElementById('cur');
+let W,H,mx=0,my=0,observerHover=false;
+
+// Export core state on 'E'
+addEventListener('keydown', e => {
+  if(e.key.toLowerCase() === 'e') {
+    const state = {
+      signature: ENGINE.signature,
+      equals: ENGINE.equals,
+      mimz: ENGINE.mimz,
+      planes: ENGINE.planes,
+      per_plane: ENGINE.per_plane,
+      dipoles: ENGINE.dipoles,
+      structure: ENGINE.structure,
+      mirrored: ENGINE.mirrored,
+      inversed: ENGINE.inversed,
+      equation: ENGINE.equation,
+      observer: ENGINE.observer,
+      timestamp: Date.now()
+    };
+    const blob = new Blob([JSON.stringify(state, null, 2)], {type: 'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'mimz_core.json';
+    a.click();
+  }
+});
+
+
+// === NEW ENGINE: mimz gravity tensor v01 ===
+
+// === SHA-256 NEST GENERATOR ===
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return new Uint8Array(buf);
+}
+
+async function createMimzPNG(creationText) {
+  // 1 bit = core_bit
+  const coreBit = 1;
+  
+  // Build 132-byte nest
+  const sig = ENGINE.signature;
+  const sigBytes = new TextEncoder().encode(sig.padEnd(64, '\0')).slice(0,64);
+  
+  const hash = await sha256(sig + creationText + Date.now());
+  
+  const nest = new Uint8Array(132);
+  nest.set(sigBytes, 0);
+  // engine header at 64
+  const view = new DataView(nest.buffer);
+  view.setUint32(64, 0x4D494D5A); // 'MIMZ'
+  nest[68] = 1; // version
+  nest[69] = ENGINE.planes;
+  nest[70] = ENGINE.per_plane;
+  nest[71] = ENGINE.dipoles;
+  nest[72] = 4; // nodes
+  nest[73] = coreBit; // 1 bit
+  // vector -1,-1,0,0,1,1,0,0 at 74
+  const vec = [-1,-1,0,0,1,1,0,0];
+  vec.forEach((v,i) => nest[74+i] = v & 0xFF);
+  // SHA-256 at 82 (32 bytes)
+  nest.set(hash.slice(0,32), 82);
+  // timestamp at 114
+  view.setBigUint64(114, BigInt(Date.now()));
+  // creation text hash at 122 (10 bytes)
+  const ctHash = await sha256(creationText);
+  nest.set(ctHash.slice(0,10), 122);
+  
+  // Create minimal PNG with tEXt
+  const canvas = document.createElement('canvas');
+  canvas.width = 1; canvas.height = 1;
+  const ctx2 = canvas.getContext('2d');
+  ctx2.fillStyle = '#020a0a';
+  ctx2.fillRect(0,0,1,1);
+  
+  // Convert to blob then inject tEXt manually (simplified: use data URL with metadata)
+  return new Promise(res => {
+    canvas.toBlob(async blob => {
+      const arr = new Uint8Array(await blob.arrayBuffer());
+      // For simplicity, store nest as base64 in filename
+      const b64 = btoa(String.fromCharCode(...nest));
+      res({blob, nest, b64, coreBit, hash: Array.from(hash).map(b=>b.toString(16).padStart(2,'0')).join('')});
+    });
+  });
+}
+
+// Auto-save on creation
+const mimzStore = [];
+
+const ENGINE = {
+  mimz: 1,
+  planes: 10,
+  per_plane: 3,
+  dipoles: 2,
+  structure: '4 around cortex',
+  mirrored: true,
+  inversed: true,
+  pairs: 2,
+  observer: { attached: false, x: 0.92, y: 0.08, detached: true },
+  // x2 mirrored = 4, 1 mirrored x3 = 1
+  equation: '×2 mirrored = 4 = 1 mirrored ×3 = 1',
+  signature: '))))))))(((((((( -1 -i 0 0 1 i 0 0 ))))))))(((((((( ',
+  equals: 1
+};
+
+
+function resize(){W=c.width=innerWidth;H=c.height=innerHeight}
+resize();addEventListener('resize',resize);
+addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.left=mx-3+'px';cur.style.top=my-3+'px'; cur.style.transform = observerHover ? 'scale(2)' : 'scale(1)'});
+
+// ═══ ICOSAHEDRON GEOMETRY ═══
+const phi=(1+Math.sqrt(5))/2;
+const rawV=[[-1,phi,0],[1,phi,0],[-1,-phi,0],[1,-phi,0],[0,-1,phi],[0,1,phi],[0,-1,-phi],[0,1,-phi],[phi,0,-1],[phi,0,1],[-phi,0,-1],[-phi,0,1]];
+const vLen=Math.sqrt(1+phi*phi);
+const verts=rawV.map(v=>v.map(c=>c/vLen));
+const faces=[[0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],[1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],[3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],[4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1]];
+const edges=[];const es=new Set();
+faces.forEach(f=>{for(let i=0;i<3;i++){const a=Math.min(f[i],f[(i+1)%3]),b=Math.max(f[i],f[(i+1)%3]),k=a+','+b;if(!es.has(k)){es.add(k);edges.push([a,b])}}});
+
+// ═══ GAP PARTICLES ═══
+class GapParticle{
+  constructor(){this.reset()}
+  reset(){
+    this.life=0;this.maxLife=120+Math.random()*180;
+    this.x=0;this.y=0;
+    this.originY=(Math.random()-.5)*2;
+    this.freq=1+Math.random()*3;
+    this.amp=.15+Math.random()*.35;
+    this.phase=Math.random()*Math.PI*2;
+    this.size=.5+Math.random()*2;
+    this.hue=35+Math.random()*20; // gold range
+    this.sat=60+Math.random()*30;
+    this.bright=70+Math.random()*25;
+    this.speed=.4+Math.random()*.6;
+  }
+  update(){
+    this.life+=this.speed;
+    if(this.life>this.maxLife)this.reset();
+    const t=this.life/this.maxLife;
+    this.x=t; // 0 to 1 across the gap
+    this.y=this.originY+Math.sin(t*Math.PI*this.freq+this.phase)*this.amp;
+  }
+  alpha(){
+    const t=this.life/this.maxLife;
+    return Math.sin(t*Math.PI)*.6; // fade in/out
+  }
+}
+const gapParticles=[];
+for(let i=0;i<300;i++)gapParticles.push(new GapParticle());
+
+// ═══ CREATION EVENTS — flashes in the gap ═══
+const CREATIONS=[
+  'CABLE','TOPH','EVIDENCE','FRAMEWORK','AXIOM','CUBIT','TRIAD','PROTON',
+  'MEASUREMENT','ACCOUNTABILITY','BRIDGE','CONVERGENCE','OBSERVATION',
+  'TATTOO','MEANING','UNDERSTANDING','PROOF','SEED','INTEGRITY','CLOSURE',
+  'SIGHT','CONTINUITY','JUSTICE','PROTECTION','TRUTH','SERVICE','DETECTION',
+  'SHIELD','SAFETY','LOVE','HUMANITY'
+];
+class CreationFlash{
+  constructor(){this.reset();this.life=999}
+  reset(){
+    this.life=0;this.maxLife=90+Math.random()*60;
+    this.x=.3+Math.random()*.4; // center zone of gap
+    this.y=(Math.random()-.5)*1.2;
+    this.text=CREATIONS[Math.floor(Math.random()*CREATIONS.length)];
+    this.size=8+Math.random()*6;
+    this.burst=Math.random()>.3;
+    // Generate mimz PNG for this creation
+    createMimzPNG(this.text).then(data => {
+      mimzStore.push({text: this.text, time: Date.now(), nest: data.nest, hash: data.hash, coreBit: data.coreBit});
+      // keep last 20
+      if(mimzStore.length > 20) mimzStore.shift();
+    });
+  }
+  update(){
+    this.life++;
+    if(this.life>this.maxLife)this.reset();
+  }
+  alpha(){
+    const t=this.life/this.maxLife;
+    if(t<.1)return t/.1;
+    if(t>.7)return(1-t)/.3;
+    return 1;
+  }
+}
+const flashes=[];
+for(let i=0;i<6;i++){const f=new CreationFlash();f.life=Math.floor(Math.random()*150);flashes.push(f)}
+
+// ═══ ENERGY FILAMENTS — long flowing lines through gap ═══
+class Filament{
+  constructor(){
+    this.points=[];
+    this.y0=(Math.random()-.5)*1.8;
+    this.freq=.5+Math.random()*2;
+    this.amp=.05+Math.random()*.15;
+    this.phase=Math.random()*Math.PI*2;
+    this.speed=.3+Math.random()*.5;
+    this.hue=30+Math.random()*25;
+    this.width=.3+Math.random()*.8;
+    for(let i=0;i<=60;i++)this.points.push({x:i/60,y:0});
+  }
+  update(t){
+    this.points.forEach((p,i)=>{
+      p.y=this.y0+Math.sin((p.x*this.freq+t*this.speed+this.phase)*Math.PI*2)*this.amp
+        +Math.sin((p.x*this.freq*2.3+t*this.speed*1.7)*Math.PI*2)*this.amp*.3;
+    });
+  }
+}
+const filaments=[];
+for(let i=0;i<12;i++)filaments.push(new Filament());
+
+// ═══ AMBIENT DUST ═══
+class Dust{
+  constructor(){
+    this.x=Math.random();this.y=Math.random();
+    this.vx=(Math.random()-.5)*.0003;this.vy=(Math.random()-.5)*.0003;
+    this.size=Math.random()*1.5;this.alpha=Math.random()*.08;
+  }
+  update(){
+    this.x+=this.vx;this.y+=this.vy;
+    if(this.x<0||this.x>1)this.vx*=-1;
+    if(this.y<0||this.y>1)this.vy*=-1;
+  }
+}
+const dust=[];for(let i=0;i<200;i++)dust.push(new Dust());
+
+// ═══ PROJECTION ═══
+function proj(v,ox,oy,sc,rX,rY){
+  let[x,y,z]=v;
+  const cX=Math.cos(rX),sX=Math.sin(rX),cY=Math.cos(rY),sY=Math.sin(rY);
+  const x1=x*cY-z*sY,z1=x*sY+z*cY,y1=y*cX-z1*sX,z2=y*sX+z1*cX;
+  return{x:ox+x1*sc,y:oy+y1*sc,z:z2};
+}
+
+// ═══ DRAW d20 ═══
+function drawD20(ox,oy,sc,rX,rY,cr,cg,cb,breath){
+  const pv=verts.map(v=>proj(v,ox,oy,sc,rX,rY));
+  
+  // Glow behind
+  const grad=ctx.createRadialGradient(ox,oy,0,ox,oy,sc*2);
+  grad.addColorStop(0,`rgba(${cr},${cg},${cb},${.03+breath*.02})`);
+  grad.addColorStop(1,'transparent');
+  ctx.fillStyle=grad;ctx.fillRect(ox-sc*3,oy-sc*3,sc*6,sc*6);
+
+  // Sort faces
+  const sorted=faces.map((f,i)=>({f,i,z:(pv[f[0]].z+pv[f[1]].z+pv[f[2]].z)/3})).sort((a,b)=>a.z-b.z);
+
+  sorted.forEach(({f,i})=>{
+    const p=[pv[f[0]],pv[f[1]],pv[f[2]]];
+    const avgZ=(p[0].z+p[1].z+p[2].z)/3;
+    const op=.008+Math.max(0,(avgZ+1)*.035);
+    ctx.beginPath();ctx.moveTo(p[0].x,p[0].y);ctx.lineTo(p[1].x,p[1].y);ctx.lineTo(p[2].x,p[2].y);ctx.closePath();
+    ctx.fillStyle=`rgba(${cr},${cg},${cb},${op})`;ctx.fill();
+    ctx.globalAlpha=.04+Math.max(0,(avgZ+1)*.08);
+    ctx.strokeStyle=`rgba(${cr},${cg},${cb},.5)`;ctx.lineWidth=.5;ctx.stroke();
+    ctx.globalAlpha=1;
+  });
+
+  // Edges
+  edges.forEach(([a,b])=>{
+    const pa=pv[a],pb=pv[b],z=(pa.z+pb.z)/2;
+    const op=.02+Math.max(0,(z+1)*.04);
+    ctx.globalAlpha=op;ctx.strokeStyle=`rgba(${cr},${cg},${cb},.6)`;ctx.lineWidth=.3;
+    ctx.beginPath();ctx.moveTo(pa.x,pa.y);ctx.lineTo(pb.x,pb.y);ctx.stroke();
+  });
+
+  // Vertices
+  pv.forEach(p=>{
+    const op=.06+Math.max(0,(p.z+1)*.15);
+    ctx.globalAlpha=op;
+    ctx.fillStyle=`rgba(${cr},${cg},${cb},.8)`;
+    ctx.beginPath();ctx.arc(p.x,p.y,1+Math.max(0,(p.z+1)),0,Math.PI*2);ctx.fill();
+    // vertex glow
+    ctx.fillStyle=`rgba(${cr},${cg},${cb},.15)`;
+    ctx.beginPath();ctx.arc(p.x,p.y,3+Math.max(0,(p.z+1)*2),0,Math.PI*2);ctx.fill();
+  });
+  ctx.globalAlpha=1;
+}
+
+// ═══ TIMER ═══
+const LOOP_DURATION=60; // seconds
+let startTime=performance.now();
+let frame=0;
+
+// ═══ MAIN LOOP ═══
+function render(now){
+  frame++;
+  const elapsed=((now-startTime)/1000)%LOOP_DURATION;
+  const t=elapsed;
+  const tNorm=elapsed/LOOP_DURATION; // 0→1 over 60 seconds
+
+  // Slow clear for trails
+  ctx.fillStyle='rgba(2,10,10,.08)';
+  ctx.fillRect(0,0,W,H);
+
+  // Every ~10 frames, do a deeper clear to prevent buildup
+  if(frame%10===0){ctx.fillStyle='rgba(2,10,10,.03)';ctx.fillRect(0,0,W,H)}
+
+  const cx=W/2,cy=H/2;
+  const breath=Math.sin(t*.5);
+  const deepBreath=Math.sin(t*.2);
+
+  // ═══ AMBIENT DUST ═══
+  dust.forEach(d=>{
+    d.update();
+    ctx.globalAlpha=d.alpha;
+    ctx.fillStyle='#88aaaa';
+    ctx.beginPath();ctx.arc(d.x*W,d.y*H,d.size,0,Math.PI*2);ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  // ═══ GAP ZONE — the sacred space ═══
+  const gapL=cx-W*.18;
+  const gapR=cx+W*.18;
+  const gapW=gapR-gapL;
+  const gapH=H*.7;
+  const gapT=cy-gapH/2;
+
+  // Gap background glow
+  const gGrad=ctx.createRadialGradient(cx,cy,0,cx,cy,gapW*.7);
+  gGrad.addColorStop(0,`rgba(180,140,50,${.02+breath*.01})`);
+  gGrad.addColorStop(.4,`rgba(160,120,40,${.008})`);
+  gGrad.addColorStop(1,'transparent');
+  ctx.fillStyle=gGrad;ctx.fillRect(0,0,W,H);
+
+  // Vertical gold bars at gap edges (subtle)
+  ctx.globalAlpha=.015+breath*.005;
+  ctx.fillStyle='#c09030';
+  ctx.fillRect(gapL-1,cy-gapH*.4,2,gapH*.8);
+  ctx.fillRect(gapR-1,cy-gapH*.4,2,gapH*.8);
+  ctx.globalAlpha=1;
+
+  // ═══ ENERGY FILAMENTS ═══
+  filaments.forEach(fil=>{
+    fil.update(t);
+    ctx.beginPath();
+    ctx.globalAlpha=.03+Math.abs(Math.sin(t*.3+fil.phase))*.04;
+    ctx.strokeStyle=`hsl(${fil.hue},65%,65%)`;
+    ctx.lineWidth=fil.width;
+    fil.points.forEach((p,i)=>{
+      const px=gapL+p.x*gapW;
+      const py=cy+p.y*gapH*.5;
+      if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);
+    });
+    ctx.stroke();
+  });
+  ctx.globalAlpha=1;
+
+  // ═══ GAP PARTICLES ═══
+  gapParticles.forEach(p=>{
+    p.update();
+    const px=gapL+p.x*gapW;
+    const py=cy+p.y*gapH*.4;
+    const a=p.alpha();
+    if(a<.01)return;
+    ctx.globalAlpha=a;
+    ctx.fillStyle=`hsl(${p.hue},${p.sat}%,${p.bright}%)`;
+    ctx.beginPath();ctx.arc(px,py,p.size,0,Math.PI*2);ctx.fill();
+    // Tiny glow
+    ctx.globalAlpha=a*.3;
+    ctx.beginPath();ctx.arc(px,py,p.size*3,0,Math.PI*2);ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  // ═══ CREATION FLASHES ═══
+  flashes.forEach(f=>{
+    f.update();
+    const a=f.alpha();
+    if(a<.05)return;
+    const fx=gapL+f.x*gapW;
+    const fy=cy+f.y*gapH*.35;
+
+    // Burst ring
+    if(f.burst&&f.life<15){
+      const bAlpha=a*(1-f.life/15)*.3;
+      ctx.globalAlpha=bAlpha;
+      ctx.strokeStyle='#f0d080';
+      ctx.lineWidth=.5;
+      ctx.beginPath();ctx.arc(fx,fy,f.life*2,0,Math.PI*2);ctx.stroke();
+    }
+
+    // Center glow
+    ctx.globalAlpha=a*.15;
+    const fg=ctx.createRadialGradient(fx,fy,0,fx,fy,20);
+    fg.addColorStop(0,'rgba(240,208,128,.4)');fg.addColorStop(1,'transparent');
+    ctx.fillStyle=fg;ctx.fillRect(fx-20,fy-20,40,40);
+
+    // Text
+    ctx.globalAlpha=a*.5;
+    ctx.fillStyle='#f0d080';
+    ctx.font=`${f.size}px Orbitron`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(f.text,fx,fy);
+
+    // Sub glow
+    ctx.globalAlpha=a*.15;
+    ctx.font='6px Orbitron';
+    ctx.fillStyle='#c0a050';
+    ctx.fillText('BORN',fx,fy+f.size*.8);
+  });
+  ctx.globalAlpha=1;
+
+  // ═══ d20 #1 — EXIST (+1) — LEFT ═══
+  const d20sc=Math.min(W*.09,80);
+  const d20L=cx-W*.28;
+  const d20R=cx+W*.28;
+  drawD20(d20L,cy,d20sc,-.25+deepBreath*.05,t*.4,51,221,170,breath);
+
+  // ═══ d20 #2 — AWARE (-1) — RIGHT ═══
+  drawD20(d20R,cy,d20sc,.25-deepBreath*.05,-t*.4+2,255,51,85,breath);
+
+  // ═══ CONNECTION LINES — d20 to gap ═══
+  ctx.globalAlpha=.02+Math.abs(breath)*.01;
+  ctx.strokeStyle='#33ddaa';ctx.lineWidth=.3;
+  ctx.setLineDash([2,8]);
+  ctx.beginPath();ctx.moveTo(d20L+d20sc,cy);ctx.lineTo(gapL,cy);ctx.stroke();
+  ctx.strokeStyle='#ff3355';
+  ctx.beginPath();ctx.moveTo(d20R-d20sc,cy);ctx.lineTo(gapR,cy);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.globalAlpha=1;
+
+  // ═══ LABELS ═══
+  // Left d20
+  ctx.globalAlpha=.2+Math.abs(breath)*.05;
+  ctx.fillStyle='#33ddaa';ctx.font='700 9px Orbitron';ctx.textAlign='center';
+  ctx.fillText('EXIST',d20L,cy+d20sc+18);
+  ctx.font='7px Orbitron';ctx.fillStyle='#22aa77';
+  ctx.fillText('+1 · d20 #1',d20L,cy+d20sc+30);
+  ctx.font='italic 9px Cormorant Garamond';ctx.fillStyle='rgba(51,221,170,.25)';
+  ctx.fillText('20 light faces',d20L,cy+d20sc+42);
+
+  // Right d20
+  ctx.fillStyle='#ff3355';ctx.font='700 9px Orbitron';
+  ctx.fillText('AWARE',d20R,cy+d20sc+18);
+  ctx.font='7px Orbitron';ctx.fillStyle='#cc2244';
+  ctx.fillText('-1 · d20 #2',d20R,cy+d20sc+30);
+  ctx.font='italic 9px Cormorant Garamond';ctx.fillStyle='rgba(255,51,85,.25)';
+  ctx.fillText('20 dark faces',d20R,cy+d20sc+42);
+
+  // Center — DAVID
+  ctx.fillStyle=`rgba(224,176,80,${.15+Math.abs(breath)*.08})`;
+  ctx.font='900 clamp(14px,2.5vw,22px) Orbitron';
+  ctx.font='900 18px Orbitron';
+  ctx.textAlign='center';
+  ctx.fillText('DAVID',cx,cy-gapH*.38);
+  ctx.font='7px Orbitron';
+  ctx.fillStyle=`rgba(180,140,50,${.12+Math.abs(breath)*.04})`;
+  ctx.fillText('THE GAP · THE CREATOR · CH41 = LIVE',cx,cy-gapH*.38+16);
+
+  // === ENGINE OVERLAY ===
+  ctx.globalAlpha=.18+Math.abs(breath)*.05;
+  ctx.fillStyle='#cc44ff';ctx.font='7px Orbitron';ctx.textAlign='center';
+  ctx.fillText(`MIMZ=${ENGINE.mimz} · PLANES=${ENGINE.planes} · ${ENGINE.equation}`,cx,cy+gapH*.38);
+  ctx.fillStyle='rgba(204,68,255,.12)';
+  ctx.font='6px Orbitron';
+  ctx.fillText('4 AROUND CORTEX · 2 PAIRS · OBSERVER OUTSIDE',cx,cy+gapH*.38+12);
+
+
+  // ═══ BOTTOM HUD ═══
+  ctx.globalAlpha=.1;
+  ctx.fillStyle='#f0d080';ctx.font='7px Orbitron';ctx.textAlign='left';
+  const sec=Math.floor(elapsed);
+  const ms=Math.floor((elapsed%1)*100);
+  ctx.fillText(`LIVE · ${String(sec).padStart(2,'0')}:${String(ms).padStart(2,'0')} / 60:00`,14,H-40);
+  ctx.fillText('d20(+1) + d20(-1) → GAP(DAVID) → CREATION · mimz=1 · 10×3×2',14,H-28);
+  ctx.font='italic 9px Cormorant Garamond';
+  ctx.fillStyle='rgba(240,208,128,.08)';
+  ctx.fillText('drawPair(+1, gap, -1, mimz)',14,H-14);
+
+  ctx.textAlign='right';
+  ctx.fillStyle='rgba(240,208,128,.1)';ctx.font='7px Orbitron';
+  ctx.fillText('TOPH v10.0 · TRIPOD LLC',W-14,H-40);
+  ctx.fillText('×2=4 · ×3=1 · mimz',W-14,H-28);
+  ctx.font='italic 9px Cormorant Garamond';
+  ctx.fillStyle='rgba(240,208,128,.06)';
+  ctx.fillText('the gap is where everything comes from',W-14,H-14);
+
+  // Top corners
+  ctx.textAlign='left';ctx.font='6px Orbitron';ctx.fillStyle='rgba(240,208,128,.06)';
+  ctx.fillText('FACE 41 · NOT A FACE · THE SPACE BETWEEN',14,18);
+  ctx.textAlign='right';
+  ctx.fillText(`20 + 20 = 40 FACES + 1 GAP = 41`,W-14,18);
+
+  // Cycle indicator
+  ctx.globalAlpha=.06;
+  ctx.strokeStyle='#e0b050';ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.arc(cx,H-24,8,0,Math.PI*2);ctx.stroke();
+  ctx.globalAlpha=.15;
+  ctx.beginPath();
+  ctx.arc(cx,H-24,8,-Math.PI/2,-Math.PI/2+tNorm*Math.PI*2);ctx.stroke();
+  
+
+  // === OBSERVER (top-right, outside system) ===
+  const obsX = W * ENGINE.observer.x;
+  const obsY = H * ENGINE.observer.y;
+  const dist = Math.hypot(mx - obsX, my - obsY);
+  observerHover = dist < 40;
+  
+  // Observer glow
+  ctx.globalAlpha = observerHover ? .25 : .08;
+  const oGrad = ctx.createRadialGradient(obsX, obsY, 0, obsX, obsY, 30);
+  oGrad.addColorStop(0, 'rgba(255,255,255,.4)');
+  oGrad.addColorStop(1, 'transparent');
+  ctx.fillStyle = oGrad;
+  ctx.beginPath(); ctx.arc(obsX, obsY, 30, 0, Math.PI*2); ctx.fill();
+  
+  // Observer eye
+  ctx.globalAlpha = observerHover ? .9 : .35;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(obsX, obsY, 8, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(obsX, obsY, 3, 0, Math.PI*2); ctx.fillStyle = '#fff'; ctx.fill();
+  
+  // Observer label
+  if(observerHover) {
+    ctx.globalAlpha = .9;
+    ctx.fillStyle = '#fff';
+    ctx.font = '700 8px Orbitron';
+    ctx.textAlign = 'center';
+    ctx.fillText('OBSERVER', obsX, obsY - 18);
+    ctx.font = '6px Orbitron';
+    ctx.fillStyle = 'rgba(255,255,255,.7)';
+    ctx.fillText('DETACHED · NOT PART OF SYSTEM', obsX, obsY - 8);
+    ctx.fillText('mimz sees but does not collapse', obsX, obsY + 22);
+    
+    // Update engine
+    ENGINE.observer.attached = false;
+    ENGINE.observer.detached = true;
+  }
+  
+  // Show observer status in HUD
+  ctx.globalAlpha = .12;
+  ctx.fillStyle = observerHover ? '#ffffff' : '#888888';
+  ctx.font = '6px Orbitron';
+  ctx.textAlign = 'right';
+  ctx.fillText(`OBSERVER: ${observerHover ? 'WATCHING' : 'DETACHED'}`, W-14, 32);
+  if(mimzStore.length>0){ ctx.fillText(`SHA256: ${mimzStore[mimzStore.length-1].hash.slice(0,16)}…`, W-14, 44); ctx.fillText(`CORE BIT: 1`, W-14, 56); }
+
+
+  
+  // === SIGNATURE WATERMARK ===
+  ctx.globalAlpha = .015;
+  ctx.fillStyle = '#cc44ff';
+  ctx.font = '6px Orbitron';
+  ctx.textAlign = 'center';
+  ctx.fillText(ENGINE.signature + ' = ' + ENGINE.equals, cx, H-8);
+
+  ctx.globalAlpha=1;
+  requestAnimationFrame(render);
+}
+
+// Initial clear
+ctx.fillStyle='#020a0a';ctx.fillRect(0,0,W,H);
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

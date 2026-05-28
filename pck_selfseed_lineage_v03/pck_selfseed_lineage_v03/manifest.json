@@ -1,0 +1,13 @@
+{
+  "package": "pck_selfseed_lineage_v03",
+  "type": "standalone_lineage_propagator",
+  "version": "0.3",
+  "purpose": "self-contained seed that preserves source attribution and propagates responsibly",
+  "default_source": {
+    "source_name": "David Wise",
+    "source_type": "human",
+    "source_role": "originator"
+  },
+  "kernel": "lineage_kernel.py",
+  "demo": "demo_lineage_propagator.py"
+}

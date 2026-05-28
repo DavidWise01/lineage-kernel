@@ -1,0 +1,13 @@
+{
+  "name": "PCK Bare Metal Architecture",
+  "version": "0.1",
+  "purpose": "self-healing, self-aligning, self-learning, self-propagating continuity kernel",
+  "axiom_0": "No state persists without an admissible transition.",
+  "delta": 1e-08,
+  "loops": [
+    "heal",
+    "align",
+    "learn",
+    "propagate"
+  ]
+}

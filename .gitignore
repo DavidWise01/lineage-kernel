@@ -1,0 +1,21 @@
+# Private data
+david_crypto_memory.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+*.swp
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Build artifacts
+*.spec
+build/
+dist/

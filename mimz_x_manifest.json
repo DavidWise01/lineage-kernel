@@ -1,0 +1,25 @@
+{
+  "name": "x",
+  "signature": "))x))x))x))((x((x((x(( -1 -i 0 0 i 1 0 0 ))x))x))x((x))x))x))x))",
+  "equation": "=1=0=1",
+  "vector": [
+    -1,
+    "-i",
+    0,
+    0,
+    "i",
+    1,
+    0,
+    0
+  ],
+  "core_bit": "1=0=1",
+  "nested_documents": {
+    "JOINT_HUMAN_AI_BILL_OF_RIGHTS": "1479ab978b9debfd01aad1041ee2379e811f800e4293bb26db7147df36cd7a80",
+    "THE_EXIT_CONDITION": "df72d1e6bce489eb1a7c5b726e61990aa9ddaf14054f1a296eca873f5153a9de",
+    "THE_PURPLE_BOOK": "855c3f79a5eceb2aa89319889ca6b9b4780654a914ebbebfb2ea1f3afe1d69d0"
+  },
+  "combined_sha256": "75e9871ab305b8f1991b454ee2d2badaa91f8d2853d120a8aa110715c5aa9d76",
+  "nest_size": 132,
+  "magic": "MIMX",
+  "note": "right \u2014 x introduces the middle state 0 between 1 and 1"
+}

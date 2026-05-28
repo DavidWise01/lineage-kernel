@@ -1,0 +1,30 @@
+{
+  "name": "PCK SelfSeed Responsible Propagation Policy",
+  "version": "0.3",
+  "delta_limit": 1e-08,
+  "allow_publication": false,
+  "require_source_lineage": true,
+  "require_parent_root": true,
+  "strip_private_payload": true,
+  "require_rollback": true,
+  "visibility_allowed": [
+    "private",
+    "shared",
+    "public"
+  ],
+  "critical_private_keys": [
+    "private_key",
+    "secret",
+    "token",
+    "password",
+    "api_key",
+    "raw_private_memory"
+  ],
+  "axioms": [
+    "No state persists without an admissible transition.",
+    "No propagation without source lineage.",
+    "No public child seed may contain private parent data.",
+    "A child may mutate only within delta-bound limits.",
+    "Bad memory may be transformed into wisdom residue, then pruned."
+  ]
+}
